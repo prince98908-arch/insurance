@@ -1,58 +1,75 @@
 import streamlit as st
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+import pickle
 
-# 1. डेटा लोड और मॉडल ट्रेनिंग (App के अंदर ही)
-@st.cache_resource
-def train_model():
-    # सीधे आपके GitHub से डेटा लिंक
-    url = "https://raw.githubusercontent.com/prince98908/arch-insurance/main/Health_insurance.xlsx%20-%20Health_Insurance.csv"
-    df = pd.read_csv(url)
-    
-    # डेटा को तैयार करना (Preprocessing)
-    df['sex'] = df['sex'].map({'female': 0, 'male': 1})
-    df['smoker'] = df['smoker'].map({'no': 0, 'yes': 1})
-    df = pd.get_dummies(df, columns=['region'], drop_first=True)
-    
-    X = df.drop('charges', axis=1)
-    y = df['charges']
-    
-    # असली मॉडल ट्रेनिंग (Object तैयार करना)
-    model = GradientBoostingRegressor(n_estimators=100, random_state=42)
-    model.fit(X, y)
-    return model
+# 1️⃣ Load trained model
+with open("insurance_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-# मॉडल को एक्टिवेट करें
-model = train_model()
+st.title("Insurance Charges Prediction")
 
-st.set_page_config(page_title="Insurance Predictor", layout="centered")
-st.title("🏥 Insurance Cost Predictor")
+# 2️⃣ Option for single input or batch via CSV
+option = st.radio("Choose input method:", ("Single Input", "Upload CSV"))
 
-# 2. यूज़र इनपुट फॉर्म
-col1, col2 = st.columns(2)
-with col1:
-    age = st.number_input("Age", 18, 100, 25)
-    bmi = st.number_input("BMI", 10.0, 50.0, 25.0)
-    children = st.selectbox("Children", [0,1,2,3,4,5])
-with col2:
-    sex = st.selectbox("Sex", ['male', 'female'])
-    smoker = st.selectbox("Smoker", ['yes', 'no'])
-    region = st.selectbox("Region", ['southeast', 'southwest', 'northeast', 'northwest'])
+if option == "Single Input":
+    # Single input form
+    age = st.number_input("Age", min_value=0, max_value=120, value=30)
+    sex = st.selectbox("Sex", ["male", "female"])
+    bmi = st.number_input("BMI", min_value=0.0, max_value=100.0, value=25.0)
+    children = st.number_input("Children", min_value=0, max_value=10, value=0)
+    smoker = st.selectbox("Smoker", ["yes", "no"])
+    region = st.selectbox("Region", ["northeast", "northwest", "southeast", "southwest"])
 
-# 3. प्रेडिक्शन बटन
-if st.button("Predict"):
-    # इनपुट डेटा को मॉडल के सीखे हुए कॉलम्स के हिसाब से सेट करना
-    input_data = pd.DataFrame({
-        'age': [age],
-        'sex': [1 if sex == 'male' else 0],
-        'bmi': [bmi],
-        'children': [children],
-        'smoker': [1 if smoker == 'yes' else 0],
-        'region_northwest': [1 if region == 'northwest' else 0],
-        'region_southeast': [1 if region == 'southeast' else 0],
-        'region_southwest': [1 if region == 'southwest' else 0]
-    })
-    
-    # यहाँ 'model' एक असली ट्रेंड ऑब्जेक्ट है, इसलिए एरर नहीं आएगा
-    prediction = model.predict(input_data)
-    st.success(f"### Estimated Cost: ${prediction[0]:,.2f}")
+    if st.button("Predict"):
+        df = pd.DataFrame({
+            'age': [age],
+            'sex': [sex],
+            'bmi': [bmi],
+            'children': [children],
+            'smoker': [smoker],
+            'region': [region]
+        })
+
+        # One-hot encoding
+        df_encoded = pd.get_dummies(df, columns=['sex', 'smoker', 'region'])
+
+        # Ensure all model columns present
+        model_columns = model.feature_names_in_
+        for col in model_columns:
+            if col not in df_encoded.columns:
+                df_encoded[col] = 0
+        df_encoded = df_encoded[model_columns]
+
+        # Prediction
+        prediction = model.predict(df_encoded)[0]
+        st.success(f"Predicted Insurance Charges: {round(prediction, 2)}")
+
+else:
+    # Batch CSV upload
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+    if uploaded_file is not None:
+        data = pd.read_csv(uploaded_file)
+        st.write("Uploaded Data:")
+        st.dataframe(data.head())
+
+        # One-hot encoding
+        df_encoded = pd.get_dummies(data, columns=['sex', 'smoker', 'region'])
+
+        # Ensure all model columns present
+        model_columns = model.feature_names_in_
+        for col in model_columns:
+            if col not in df_encoded.columns:
+                df_encoded[col] = 0
+        df_encoded = df_encoded[model_columns]
+
+        # Prediction
+        predictions = model.predict(df_encoded)
+        data['Predicted Charges'] = predictions
+        st.write("Predictions:")
+        st.dataframe(data)
+        st.download_button(
+            "Download Predictions CSV",
+            data.to_csv(index=False).encode('utf-8'),
+            file_name="predictions.csv",
+            mime="text/csv"
+        )
