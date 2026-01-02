@@ -2,20 +2,20 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Page config
+# ---------------- Page Config ----------------
 st.set_page_config(
     page_title="Insurance Charges Prediction",
     layout="centered"
 )
 
-# Load trained model (pipeline)
+# ---------------- Load Model ----------------
 model = joblib.load("insurance_model.pkl")
 
-# App title
+# ---------------- Title ----------------
 st.title("💰 Insurance Charges Prediction App")
 st.write("Predict medical insurance cost based on personal details")
 
-# Sidebar inputs
+# ---------------- Sidebar Inputs ----------------
 st.sidebar.header("Enter User Details")
 
 age = st.sidebar.slider("Age", 18, 65, 30)
@@ -28,23 +28,21 @@ region = st.sidebar.selectbox(
     ["southwest", "southeast", "northwest", "northeast"]
 )
 
-# Create input dataframe
+# ---------------- Manual Encoding (IMPORTANT) ----------------
 input_data = pd.DataFrame({
     "age": [age],
-    "sex": [sex],
     "bmi": [bmi],
     "children": [children],
-    "smoker": [smoker],
-    "region": [region]
+
+    "sex_male": [1 if sex == "male" else 0],
+    "smoker_yes": [1 if smoker == "yes" else 0],
+
+    "region_northwest": [1 if region == "northwest" else 0],
+    "region_southeast": [1 if region == "southeast" else 0],
+    "region_southwest": [1 if region == "southwest" else 0],
 })
 
-# Prediction button
+# ---------------- Prediction ----------------
 if st.button("Predict Insurance Charges"):
     prediction = model.predict(input_data)[0]
-
     st.success(f"💵 Estimated Insurance Charges: ₹ {prediction:,.2f}")
-
-# Footer
-st.markdown("---")
-st.markdown("📌 **Model**: Gradient Boosting Regressor")
-st.markdown("📊 **Metric**: R² ≈ 0.84")
