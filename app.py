@@ -6,6 +6,7 @@ import pickle
 st.set_page_config(page_title="Insurance Charges Predictor")
 
 st.title("💰 Insurance Charges Prediction")
+st.write("Devloped by PRINCE RAJPUT")
 
 # -----------------------------------
 # Safe model loader
